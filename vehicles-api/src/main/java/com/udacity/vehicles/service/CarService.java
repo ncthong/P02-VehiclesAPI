@@ -5,9 +5,13 @@ import com.udacity.vehicles.client.prices.PriceClient;
 import com.udacity.vehicles.domain.Location;
 import com.udacity.vehicles.domain.car.Car;
 import com.udacity.vehicles.domain.car.CarRepository;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import com.udacity.vehicles.domain.manufacturer.Manufacturer;
+import com.udacity.vehicles.domain.manufacturer.ManufacturerRepository;
 import org.springframework.stereotype.Service;
 
 /**
@@ -21,11 +25,13 @@ public class CarService {
     private final CarRepository repository;
     private final PriceClient priceClient;
     private final MapsClient mapsClient;
+    private final ManufacturerRepository manufacturerRepository;
 
-    public CarService(CarRepository repository, PriceClient priceClient, MapsClient mapsClient) {
+    public CarService(CarRepository repository, PriceClient priceClient, MapsClient mapsClient, ManufacturerRepository manufacturerRepository) {
         this.repository = repository;
         this.priceClient = priceClient;
         this.mapsClient = mapsClient;
+        this.manufacturerRepository = manufacturerRepository;
     }
 
     /**
@@ -69,19 +75,32 @@ public class CarService {
      * @return the new/updated car is stored in the repository
      */
     public Car save(Car car) {
-        if (car.getId() != null) {
+        if (car.getId() != null && car.getId() != 0) {
             return repository.findById(car.getId())
                     .map(carToBeUpdated -> {
                         carToBeUpdated.setDetails(car.getDetails());
                         carToBeUpdated.setLocation(car.getLocation());
                         carToBeUpdated.setCondition(car.getCondition());
                         carToBeUpdated.setPrice(car.getPrice());
+                        carToBeUpdated.setModifiedAt(LocalDateTime.now());
                         return repository.save(carToBeUpdated);
                     }).orElseThrow(CarNotFoundException::new);
+        } else {
+            if (car.getCreatedAt() == null) {
+                car.setCreatedAt(LocalDateTime.now());
+            }
+            car.setModifiedAt(LocalDateTime.now());
+            // Check if manufacturer is null and save if it is not null
+            if (car.getDetails() != null && car.getDetails().getManufacturer() != null) {
+                Manufacturer manufacturer = car.getDetails().getManufacturer();
+                if (manufacturer.getCode() == null || manufacturer.getCode() == 0) {
+                    // If manufacturer id is null or 0, it means the manufacturer is new and needs to be saved first
+                    Manufacturer savedManufacturer = manufacturerRepository.save(manufacturer);
+                    car.getDetails().setManufacturer(savedManufacturer);
+                }
+            }
+            return repository.save(car);
         }
-        car.setCreatedAt(car.getCreatedAt());
-        car.setModifiedAt(car.getModifiedAt());
-        return repository.save(car);
     }
 
     /**

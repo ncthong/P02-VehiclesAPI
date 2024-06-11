@@ -18,6 +18,7 @@ import com.udacity.vehicles.domain.car.Car;
 import com.udacity.vehicles.domain.car.CarRepository;
 import com.udacity.vehicles.domain.car.Details;
 import com.udacity.vehicles.domain.manufacturer.Manufacturer;
+import com.udacity.vehicles.domain.manufacturer.ManufacturerRepository;
 import com.udacity.vehicles.service.CarService;
 import java.net.URI;
 import java.util.Collections;
@@ -51,6 +52,9 @@ public class CarControllerTest {
 
     @MockBean
     private CarRepository repository;
+    @MockBean
+    private ManufacturerRepository manufacturerRepository;
+
     @Autowired
     private JacksonTester<Car> json;
 
@@ -79,14 +83,35 @@ public class CarControllerTest {
      * Tests for successful creation of new car in the system
      * @throws Exception when car creation fails in the system
      */
+//    @Test
+//    public void createCar() throws Exception {
+//        Car car = getCar();
+//        mvc.perform(
+//                post(new URI("/cars"))
+//                        .content(json.write(car).getJson())
+//                        .contentType(MediaType.APPLICATION_JSON_UTF8)
+//                        .accept(MediaType.APPLICATION_JSON_UTF8))
+//                .andExpect(status().isCreated());
+//    }
     @Test
     public void createCar() throws Exception {
         Car car = getCar();
+
+        if (car.getDetails() != null && car.getDetails().getManufacturer() != null) {
+            Manufacturer manufacturer = car.getDetails().getManufacturer();
+            if (manufacturer.getCode() == null || manufacturer.getCode() == 0) {
+                Manufacturer savedManufacturer = new Manufacturer();
+                savedManufacturer.setName(manufacturer.getName());
+                manufacturer = manufacturerRepository.save(savedManufacturer);
+                car.getDetails().setManufacturer(manufacturer);
+            }
+        }
+
         mvc.perform(
-                post(new URI("/cars"))
-                        .content(json.write(car).getJson())
-                        .contentType(MediaType.APPLICATION_JSON_UTF8)
-                        .accept(MediaType.APPLICATION_JSON_UTF8))
+                        post(new URI("/cars"))
+                                .content(json.write(car).getJson())
+                                .contentType(MediaType.APPLICATION_JSON_UTF8)
+                                .accept(MediaType.APPLICATION_JSON_UTF8))
                 .andExpect(status().isCreated());
     }
 
@@ -99,6 +124,7 @@ public class CarControllerTest {
     public void listCars() throws Exception {
         Car car = getCar();
         car.setId(1L);
+        repository.save(car);
         mvc.perform(get(new URI("/cars")).accept(MediaType.APPLICATION_JSON_UTF8)).andExpect(status().isOk());
     }
 
@@ -114,8 +140,18 @@ public class CarControllerTest {
         mvc.perform(MockMvcRequestBuilders.get("/cars/1")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.status().isOk())
-                .andExpect(MockMvcResultMatchers.jsonPath("$.id").value(1L));
-
+                .andExpect(MockMvcResultMatchers.jsonPath("$.id").value(1L))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.details.manufacturer.code").value(101))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.details.manufacturer.name").value("Chevrolet"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.details.model").value("Impala"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.details.mileage").value(32280))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.details.externalColor").value("white"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.details.body").value("sedan"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.details.engine").value("3.6L V6"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.details.fuelType").value("Gasoline"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.details.modelYear").value(2018))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.details.productionYear").value(2018))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.details.numberOfDoors").value(4));        ;
         verify(carService, times(1)).findById(1L);
     }
 
@@ -135,12 +171,15 @@ public class CarControllerTest {
         Car car = getCar();
         car.setCondition(Condition.NEW);
         car.setId(1L);
+        when(carService.save(any(Car.class))).thenReturn(car);
+
         mvc.perform(put(new URI("/cars/" + car.getId()))
                 .content(json.write(car).getJson())
                 .contentType(MediaType.APPLICATION_JSON_UTF8)
                 .accept(MediaType.APPLICATION_JSON_UTF8))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(car.getId()))
+                .andExpect(jsonPath("$.condition").value(car.getCondition().toString()))
                 .andReturn();
     }
 
