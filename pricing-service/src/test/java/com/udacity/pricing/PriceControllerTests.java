@@ -24,9 +24,15 @@ public class PriceControllerTests {
     PricingService pricingService;
 
 
+
     @Test
     public void getPrice() throws Exception {
-        mockMvc.perform(get("/services/price?vehicleId=1")).andExpect(status().isOk())
-                .andExpect(content().json("{\"currency\":\"USD\",\"vehicleId\":1}"));
+
+        String expectedJson = "{\"currency\":\"USD\",\"vehicleId\":1}";
+
+        mockMvc.perform(get("/services/price?vehicleId=1"))
+                .andExpect(status().isOk())
+                .andExpect(content().json(expectedJson));
     }
+
 }
